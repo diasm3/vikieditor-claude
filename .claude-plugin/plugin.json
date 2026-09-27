@@ -1,0 +1,39 @@
+{
+  "name": "vikieditor-channel",
+  "displayName": "VikiEditor",
+  "version": "0.1.0",
+  "description": "Feedback and handoffs from your VikiEditor wiki arrive in your running Claude Code session, and tool approvals can be answered from your phone.",
+  "author": { "name": "VikiEditor" },
+  "homepage": "https://vikieditor.piai.company",
+  "mcpServers": {
+    "vikieditor-channel": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server.mjs"],
+      "env": {
+        "VIKIEDITOR_API_KEY": "${user_config.api_key}",
+        "VIKIEDITOR_URL": "${user_config.server_url}"
+      }
+    }
+  },
+  "channels": [
+    {
+      "server": "vikieditor-channel",
+      "displayName": "VikiEditor",
+      "userConfig": {
+        "api_key": {
+          "type": "string",
+          "title": "VikiEditor API key",
+          "description": "VikiEditor → Settings → Connections → Create New Key (vk_…)",
+          "sensitive": true
+        }
+      }
+    }
+  ],
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "VikiEditor API URL",
+      "description": "VikiEditor API host. Leave empty for https://api.piai.company"
+    }
+  }
+}
