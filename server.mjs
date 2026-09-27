@@ -10,7 +10,7 @@
 
 import { basename } from "node:path"
 
-const VERSION = "0.1.0"
+const VERSION = "0.1.1"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
