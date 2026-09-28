@@ -1,7 +1,7 @@
 // node --test integrations/claude-code-channel/test — no dependencies.
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { baseSession, forAnotherSession, hostLabel, instanceId, streamUrl } from "../session.mjs"
+import { baseSession, channelsOn, forAnotherSession, hostLabel, instanceId, streamUrl } from "../session.mjs"
 
 test("the base name: VIKIEDITOR_SESSION, then the config, then the folder", () => {
   assert.equal(baseSession({ VIKIEDITOR_SESSION: "haist" }, { session: "cfg" }, "folder"), "haist")
@@ -65,4 +65,19 @@ test("an event is for this window when targetSession is the assigned or the base
   assert.equal(forAnotherSession("HAIST", names), false)
   assert.equal(forAnotherSession("haist-3", names), true)
   assert.equal(forAnotherSession("carhos", names), true)
+})
+
+test("a Claude Code started without the channel flag does not listen; unknown parents still do", () => {
+  const plugin = ["plugin:vikieditor-channel@vikieditor"]
+  assert.equal(channelsOn(["claude", "--dangerously-load-development-channels", ...plugin, "--resume", "abc"]), true)
+  assert.equal(channelsOn(["claude", "--channels=plugin:vikieditor-channel@vikieditor"]), true)
+  assert.equal(channelsOn(["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js", "--channels", ...plugin]), true)
+  // Started without the flag: resumed, or in a folder
+  assert.equal(channelsOn(["claude", "--resume", "3b2e34e2"]), false)
+  assert.equal(channelsOn(["/Users/me/.local/bin/claude", "."]), false)
+  assert.equal(channelsOn(["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"]), false)
+  // Cannot tell: listen as before
+  assert.equal(channelsOn(null), null)
+  assert.equal(channelsOn([]), null)
+  assert.equal(channelsOn(["zsh", "-c", "node server.mjs"]), null)
 })

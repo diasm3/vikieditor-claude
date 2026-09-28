@@ -8,12 +8,13 @@
 // VikiEditor app on your phone.
 // Docs: https://code.claude.com/docs/en/channels-reference
 
+import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { hostname } from "node:os"
 import { basename, dirname, join } from "node:path"
-import { baseSession, forAnotherSession, hostLabel, instanceId, streamUrl } from "./session.mjs"
+import { baseSession, channelsOn, forAnotherSession, hostLabel, instanceId, streamUrl } from "./session.mjs"
 
-const VERSION = "0.2.4"
+const VERSION = "0.2.5"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
@@ -52,6 +53,28 @@ let ASSIGNED_SESSION = BASE_SESSION
 const INSTANCE = instanceId(process.env)
 let scopeView = null
 let told = false
+
+// The command line of the Claude Code that started this plugin (its parent process), or null
+function parentArgs() {
+  try {
+    if (process.platform === "linux")
+      return readFileSync(`/proc/${process.ppid}/cmdline`, "utf8").split("\0").filter(Boolean)
+    if (process.platform === "darwin")
+      return execFileSync("ps", ["-o", "command=", "-p", String(process.ppid)], { encoding: "utf8", timeout: 2000 })
+        .trim()
+        .split(/\s+/)
+  } catch {
+    // cannot tell: listen as before
+  }
+  return null
+}
+// A window started without the channel flag never shows our events, yet a listening stream would
+// still be chosen for them (and hold them for 10 minutes). Such a window serves channel_status only.
+// VIKIEDITOR_CHANNEL_CHECK=off listens regardless.
+const CHANNEL_OFF = process.env.VIKIEDITOR_CHANNEL_CHECK !== "off" && channelsOn(parentArgs()) === false
+const RESTART = `claude --dangerously-load-development-channels plugin:vikieditor-channel@vikieditor${
+  process.env.CLAUDE_CODE_SESSION_ID ? ` --resume ${process.env.CLAUDE_CODE_SESSION_ID}` : ""
+}`
 
 const INSTRUCTIONS = [
   'VikiEditor events arrive as <channel source="vikieditor-channel" kind="feedback|handoff" ...>.',
@@ -100,6 +123,10 @@ async function handle(message) {
           },
         })
       case "notifications/initialized":
+        if (CHANNEL_OFF) {
+          log("this Claude Code was started without the channel flag; not listening, so other windows get the events")
+          return
+        }
         if (!started) {
           started = true
           void listen()
@@ -113,9 +140,11 @@ async function handle(message) {
         if (params?.name !== "channel_status") return send({ id, error: { code: -32602, message: `Unknown tool: ${params?.name}` } })
         const text = !API_KEY
           ? "Not configured: set the VikiEditor API key with /plugin configure vikieditor-channel@vikieditor."
-          : connected
-            ? `Connected to ${BASE_URL} as session "${ASSIGNED_SESSION}". ${describeScope()} Feedback and handoffs arrive here as they are written.`
-            : `Not connected to ${BASE_URL} right now; retrying.`
+          : CHANNEL_OFF
+            ? `Channel off in this window: Claude Code was started without --dangerously-load-development-channels, so VikiEditor events would not show here. Not listening, so other windows get them. To get them here, quit and restart with: ${RESTART}`
+            : connected
+              ? `Connected to ${BASE_URL} as session "${ASSIGNED_SESSION}". ${describeScope()} Feedback and handoffs arrive here as they are written.`
+              : `Not connected to ${BASE_URL} right now; retrying.`
         return send({ id, result: { content: [{ type: "text", text }] } })
       }
       case "notifications/claude/channel/permission_request":

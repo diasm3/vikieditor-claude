@@ -33,6 +33,8 @@ The channel only delivers events. The work itself goes through the VikiEditor MC
 
    Channels are a research preview. Plugins outside Anthropic's allowlist need this flag. On Team and Enterprise plans an admin must turn on channels (`channelsEnabled`) and can add this plugin to `allowedChannelPlugins`, after which `--channels plugin:vikieditor-channel@vikieditor` is enough.
 
+   A window started without the flag (a plain `claude --resume`, say) does not listen, since 0.2.5: Claude Code would not show its events there, yet the server could still pick it for a comment and hold the comment for 10 minutes. `channel_status` in such a window says so and prints the command to restart it with the flag. The plugin reads this from the command line of the Claude Code that started it; when it cannot tell, it listens as before.
+
 The session appears in VikiEditor under **Settings → Connections** while it is listening. Its name is the folder Claude Code runs in; set `VIKIEDITOR_SESSION` to choose another. A second window with the same name gets `-2`, `-3` …; see [Session names](#session-names).
 
 ## Several sessions: who gets which feedback
@@ -76,6 +78,7 @@ For one window only: `VIKIEDITOR_SCOPE="folder:VikiEditor,tag:vikieditor"`. The 
 | `VIKIEDITOR_URL` | `https://api.piai.company` | VikiEditor's API host, if self-hosted |
 | `VIKIEDITOR_SESSION` | `.vikieditor.json` `session`, else the working folder's name | Session name shown in VikiEditor |
 | `VIKIEDITOR_SCOPE` | `.vikieditor.json` `folders`/`tags` | `folder:A,tag:b` or JSON; what this session looks after |
+| `VIKIEDITOR_CHANNEL_CHECK` | on | `off`: listen even in a window started without the channel flag |
 | `VIKIEDITOR_INSTANCE` | a random id per process | Tells the server a reconnect is the same window, so it keeps the session's name; set it only to pin one |
 
 Requires Node.js 18 or later. No other dependencies.

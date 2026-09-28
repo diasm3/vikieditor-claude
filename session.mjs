@@ -52,3 +52,18 @@ export function forAnotherSession(targetSession, names) {
   const target = targetSession.toLowerCase()
   return !names.some((name) => typeof name === "string" && name.toLowerCase() === target)
 }
+
+/**
+ * Whether the Claude Code that started this plugin has channels on, read from its command line
+ * (args): true with --channels or --dangerously-load-development-channels; false when it is
+ * Claude Code without either, which runs the plugin for its tools but shows none of its events;
+ * null when it cannot tell (unreadable, or not Claude Code), and the plugin listens as before.
+ */
+export function channelsOn(args) {
+  if (!Array.isArray(args) || !args.length) return null
+  if (args.some((arg) => /^--(dangerously-load-development-channels|channels)(=|$)/.test(arg))) return true
+  const claude = args
+    .slice(0, 2)
+    .some((arg) => /(^|[\\/])claude(\.exe)?$/i.test(arg) || /[\\/]claude-code[\\/]/i.test(arg))
+  return claude ? false : null
+}

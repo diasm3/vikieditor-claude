@@ -10,7 +10,7 @@
       "displayName": "VikiEditor",
       "source": "./",
       "description": "Feedback and handoffs from your VikiEditor wiki arrive in your running Claude Code session; answer tool approvals from your phone.",
-      "version": "0.2.4"
+      "version": "0.2.5"
     }
   ]
 }
