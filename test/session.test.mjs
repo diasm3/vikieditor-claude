@@ -1,7 +1,7 @@
 // node --test integrations/claude-code-channel/test — no dependencies.
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { baseSession, forAnotherSession, instanceId, streamUrl } from "../session.mjs"
+import { baseSession, forAnotherSession, hostLabel, instanceId, streamUrl } from "../session.mjs"
 
 test("the base name: VIKIEDITOR_SESSION, then the config, then the folder", () => {
   assert.equal(baseSession({ VIKIEDITOR_SESSION: "haist" }, { session: "cfg" }, "folder"), "haist")
@@ -36,6 +36,25 @@ test("every connect asks for the base name with the instance id, never the assig
   ).searchParams
   assert.equal(scoped.get("session"), "a b")
   assert.equal(scoped.get("scope"), '{"tags":["x"]}')
+})
+
+test("the computer, repository and version go along for Settings (0.2.4+)", () => {
+  const params = new URL(
+    streamUrl("https://api.example", {
+      session: "haist",
+      instance: "p1",
+      scope: "",
+      host: hostLabel("Steves-MacBook.local"),
+      repo: "r".repeat(80),
+      version: "0.2.4",
+    }),
+  ).searchParams
+  assert.equal(params.get("host"), "Steves-MacBook")
+  assert.equal(params.get("repo"), "r".repeat(64))
+  assert.equal(params.get("version"), "0.2.4")
+  assert.equal(params.get("client"), "claude-code")
+  assert.equal(hostLabel("x".repeat(90)).length, 64)
+  assert.equal(hostLabel(undefined), "")
 })
 
 test("an event is for this window when targetSession is the assigned or the base name", () => {

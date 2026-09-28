@@ -9,10 +9,11 @@
 // Docs: https://code.claude.com/docs/en/channels-reference
 
 import { existsSync, readFileSync } from "node:fs"
+import { hostname } from "node:os"
 import { basename, dirname, join } from "node:path"
-import { baseSession, forAnotherSession, instanceId, streamUrl } from "./session.mjs"
+import { baseSession, forAnotherSession, hostLabel, instanceId, streamUrl } from "./session.mjs"
 
-const VERSION = "0.2.3"
+const VERSION = "0.2.4"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
@@ -249,7 +250,14 @@ async function listen() {
   for (;;) {
     try {
       // Always the base name (never the one the server assigned) and this process's instance id
-      const url = streamUrl(BASE_URL, { session: BASE_SESSION, instance: INSTANCE, scope: SCOPE })
+      const url = streamUrl(BASE_URL, {
+        session: BASE_SESSION,
+        instance: INSTANCE,
+        scope: SCOPE,
+        host: hostLabel(hostname()),
+        repo: basename(process.cwd()),
+        version: VERSION,
+      })
       const abort = new AbortController()
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${API_KEY}`, Accept: "text/event-stream" },

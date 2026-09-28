@@ -20,10 +20,27 @@ export function instanceId(env) {
   return (env.VIKIEDITOR_INSTANCE || randomUUID()).slice(0, 64)
 }
 
-/** The event-stream URL: always the base name and the instance id, never the name the server assigned. */
-export function streamUrl(baseUrl, { session, instance, scope }) {
-  const query = `client=claude-code&session=${encodeURIComponent(session)}&instance=${encodeURIComponent(instance)}`
-  return `${baseUrl}/api/agent-events?${query}${scope ? `&scope=${encodeURIComponent(scope)}` : ""}`
+/** The computer's name for Settings: up to the first dot ("steves-mac.local" → "steves-mac"), 64 characters. */
+export function hostLabel(hostname) {
+  return (typeof hostname === "string" ? hostname.split(".")[0] || hostname : "").trim().slice(0, 64)
+}
+
+/**
+ * The event-stream URL: always the base name and the instance id, never the name the server assigned.
+ * host (the computer), repo (the working folder's name) and version let Settings group the sessions
+ * by computer and repository and say when the plugin needs an update (0.2.4+).
+ */
+export function streamUrl(baseUrl, { session, instance, scope, host, repo, version }) {
+  const params = [
+    ["client", "claude-code"],
+    ["session", session],
+    ["instance", instance],
+    ["host", host],
+    ["repo", repo ? String(repo).slice(0, 64) : repo],
+    ["version", version],
+    ["scope", scope],
+  ].filter(([, value]) => value)
+  return `${baseUrl}/api/agent-events?${params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`
 }
 
 /**

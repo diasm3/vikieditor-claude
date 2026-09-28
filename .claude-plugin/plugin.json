@@ -1,7 +1,7 @@
 {
   "name": "vikieditor-channel",
   "displayName": "VikiEditor",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Feedback and handoffs from your VikiEditor wiki arrive in your running Claude Code session, and tool approvals can be answered from your phone.",
   "author": {
     "name": "VikiEditor"

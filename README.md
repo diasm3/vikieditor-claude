@@ -52,6 +52,10 @@ Each event names the session it was sent to (`targetSession`). Since 0.2.1 the p
 
 The plugin always connects with its base name (the folder, the config's `session` or `VIKIEDITOR_SESSION`) and a stable per-process instance id; the name the server gives back is only shown. A window that reconnects (network hiccup, server restart) is recognised by its instance and keeps the name it had. A base name no live window holds is given as is, also when asked for with an old suffix (`haist-2-2` → `haist`; a trailing `-<number>` counts as a window suffix), and `-2`, `-3` … (the lowest free number) only go to a real second window with the same base name. A stream the server has not heard from for 2.5 minutes holds no name. Before 0.2.2 the plugin reconnected with the suffixed name it had been given, and names grew to `haist-2-2-2` ….
 
+### In VikiEditor Settings
+
+Settings → Connections lists the listening sessions grouped by computer and repository. Since 0.2.4 the plugin sends the computer's name (`os.hostname()` up to the first dot), the working folder's name and its version with the connection; sessions from older plugins are grouped under the API key's name and marked as needing an update. **Disconnect** there ends that session's stream on the server: a plugin that is still running reconnects by itself a second later (it is meant for windows that are gone), so to stop a session for good, close that Claude Code window.
+
 Put the scope in the repository, so every window on it gets the same, as `.vikieditor.json` at its root (the plugin looks in the working folder and above):
 
 ```json
