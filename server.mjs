@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 
-const VERSION = "0.2.0"
+const VERSION = "0.2.1"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
@@ -55,6 +55,7 @@ const INSTRUCTIONS = [
   'VikiEditor events arrive as <channel source="vikieditor-channel" kind="feedback|handoff" ...>.',
   "They come from the person who owns the VikiEditor wiki you report to: feedback on a document agents wrote, or a handoff (the next task).",
   "Act on them with the VikiEditor MCP server's tools: feedback action=take (or handoff action=take) first so other sessions skip it, do the work, then feedback action=reply with what you changed (or handoff action=done).",
+  "An event that says it was delivered to another session is information only: that session takes it, you do not.",
   "If you are in the middle of unrelated work, finish the current step or tell the user before switching.",
   "Call the VikiEditor MCP server's session tool with this channel's session name (channel_status shows it), so feedback on documents you write comes back to this session.",
   "Tool-approval prompts may be answered from the person's phone.",
@@ -148,6 +149,11 @@ process.stdin.on("end", () => process.exit(0))
 const quote = (text, max = 400) => (text && text.length > max ? `${text.slice(0, max - 1)}…` : text)
 const short = (id) => String(id).slice(0, 8)
 
+// The server routes a document's event to one session and names it (targetSession; null when it
+// went to everyone). One meant for another session is shown for information, not to act on.
+const forAnother = (event) =>
+  typeof event.targetSession === "string" && event.targetSession.toLowerCase() !== SESSION.toLowerCase()
+
 function toChannel(name, event) {
   if (name === "feedback") {
     const where = `"${event.documentTitle}"${event.heading ? ` › ${event.heading}` : ""}`
@@ -157,13 +163,26 @@ function toChannel(name, event) {
       quote(event.body, 2000),
     ]
     if (event.quote) lines.push(`On: "${quote(event.quote)}"`)
-    lines.push(`Take it with the VikiEditor tools: feedback action=take commentId=${short(event.threadId)}, fix the document, then feedback action=reply.`)
-    return { content: lines.join("\n"), meta: { kind: "feedback", thread_id: event.threadId, document_id: event.documentId } }
+    lines.push(
+      forAnother(event)
+        ? `Delivered to session "${event.targetSession}", which takes it; do not take it here.`
+        : `Take it with the VikiEditor tools: feedback action=take commentId=${short(event.threadId)}, fix the document, then feedback action=reply.`,
+    )
+    const meta = { kind: "feedback", thread_id: event.threadId, document_id: event.documentId }
+    if (event.targetSession) meta.target_session = event.targetSession
+    return { content: lines.join("\n"), meta }
   }
   if (name === "handoff") {
-    const lines = [`New handoff: ${event.title}`, quote(event.body, 3000), `Pick it up with handoff action=take id=${short(event.handoffId)} when you are free.`]
+    const lines = [
+      `New handoff: ${event.title}`,
+      quote(event.body, 3000),
+      forAnother(event)
+        ? `Delivered to session "${event.targetSession}", which picks it up; do not take it here.`
+        : `Pick it up with handoff action=take id=${short(event.handoffId)} when you are free.`,
+    ]
     const meta = { kind: "handoff", handoff_id: event.handoffId }
     if (event.documentId) meta.document_id = event.documentId
+    if (event.targetSession) meta.target_session = event.targetSession
     return { content: lines.join("\n"), meta }
   }
   return null

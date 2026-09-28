@@ -41,10 +41,12 @@ With several Claude Code windows listening (tmux, different repositories), each 
 
 1. the session that has taken the thread;
 2. else the session that last wrote the document (the agent names its VikiEditor MCP session after the channel's session, as the channel asks it to);
-3. else the sessions whose **scope** covers the document (its folders, or its tags);
-4. else the sessions without a scope.
+3. else **one** of the sessions whose **scope** covers the document (its folders, or its tags) — the most recently active;
+4. else **one** of the sessions without a scope — the most recently active.
 
-Nobody fits: the comment waits until a session takes it. Events without a document (a handoff with none) go to every session.
+One session at a time, so two windows (or two computers) never both answer. If the chosen session has not taken the thread within 10 minutes, the next candidate in that order hears it. Nobody fits: the comment waits until a session takes it. Events without a document (a handoff with none) go to every session.
+
+Each event names the session it was sent to (`targetSession`). Since 0.2.1 the plugin shows an event meant for another session as information only, without the "take it" instruction; the server also refuses `feedback action=take` on a thread another session has answered or is handling, so the agent skips it.
 
 Put the scope in the repository, so every window on it gets the same, as `.vikieditor.json` at its root (the plugin looks in the working folder and above):
 
