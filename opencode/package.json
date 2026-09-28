@@ -1,0 +1,28 @@
+{
+  "name": "@vikieditor/opencode-plugin",
+  "version": "0.1.0",
+  "description": "Feedback and handoffs from your VikiEditor wiki go into your running OpenCode session; answer tool approvals from your phone.",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./server": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "lib.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.32",
+    "@opencode-ai/sdk": "^1.18.32"
+  },
+  "homepage": "https://vikieditor.piai.company",
+  "private": true
+}

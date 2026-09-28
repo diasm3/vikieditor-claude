@@ -8,6 +8,8 @@ Your running Claude Code session hears about VikiEditor as it happens:
 
 The channel only delivers events. The work itself goes through the VikiEditor MCP server (`feedback`, `handoff`, `update_document` …), so connect that too.
 
+> Using **OpenCode**? The same events, routing and phone approvals come as an OpenCode plugin: see [opencode/README.md](opencode/README.md).
+
 ## Setup
 
 1. In VikiEditor: **Settings → Connections → Create New Key**. Copy the key (`vk_…`).
