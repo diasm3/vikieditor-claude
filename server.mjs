@@ -8,22 +8,55 @@
 // VikiEditor app on your phone.
 // Docs: https://code.claude.com/docs/en/channels-reference
 
-import { basename } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 
-const VERSION = "0.1.1"
+const VERSION = "0.2.0"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
 const HEARTBEAT_MS = 60_000
 const API_KEY = (process.env.VIKIEDITOR_API_KEY || "").trim()
-// The session's name in VikiEditor: the folder Claude Code runs in, unless set
-const SESSION = (process.env.VIKIEDITOR_SESSION || basename(process.cwd()) || "claude-code").slice(0, 100)
+// What this session looks after: .vikieditor.json in the working folder or above (checked into the
+// repository, so every window on it gets the same), or VIKIEDITOR_SCOPE="folder:A,tag:b".
+//   { "session": "vikieditor", "folders": ["VikiEditor"], "tags": ["vikieditor"] }
+function findConfig(dir = process.cwd()) {
+  for (let at = dir; ; at = dirname(at)) {
+    const file = join(at, ".vikieditor.json")
+    if (existsSync(file)) {
+      try {
+        return JSON.parse(readFileSync(file, "utf8"))
+      } catch {
+        process.stderr.write(`[vikieditor-channel] could not read ${file}\n`)
+        return {}
+      }
+    }
+    if (dirname(at) === at) return {}
+  }
+}
+const CONFIG = findConfig()
+const SCOPE = process.env.VIKIEDITOR_SCOPE
+  ? process.env.VIKIEDITOR_SCOPE
+  : Array.isArray(CONFIG.folders) || Array.isArray(CONFIG.tags)
+    ? JSON.stringify({ folders: CONFIG.folders ?? [], tags: CONFIG.tags ?? [] })
+    : ""
+// The session's name in VikiEditor: VIKIEDITOR_SESSION, the config's "session", or the folder
+// Claude Code runs in. The server adds "-2" … when another window already has it.
+let SESSION = (
+  process.env.VIKIEDITOR_SESSION ||
+  (typeof CONFIG.session === "string" && CONFIG.session) ||
+  basename(process.cwd()) ||
+  "claude-code"
+).slice(0, 100)
+let scopeView = null
+let told = false
 
 const INSTRUCTIONS = [
   'VikiEditor events arrive as <channel source="vikieditor-channel" kind="feedback|handoff" ...>.',
   "They come from the person who owns the VikiEditor wiki you report to: feedback on a document agents wrote, or a handoff (the next task).",
   "Act on them with the VikiEditor MCP server's tools: feedback action=take (or handoff action=take) first so other sessions skip it, do the work, then feedback action=reply with what you changed (or handoff action=done).",
   "If you are in the middle of unrelated work, finish the current step or tell the user before switching.",
+  "Call the VikiEditor MCP server's session tool with this channel's session name (channel_status shows it), so feedback on documents you write comes back to this session.",
   "Tool-approval prompts may be answered from the person's phone.",
 ].join(" ")
 
@@ -76,9 +109,9 @@ async function handle(message) {
       case "tools/call": {
         if (params?.name !== "channel_status") return send({ id, error: { code: -32602, message: `Unknown tool: ${params?.name}` } })
         const text = !API_KEY
-          ? "Not configured: set the VikiEditor API key in the plugin settings."
+          ? "Not configured: set the VikiEditor API key with /plugin configure vikieditor-channel@vikieditor."
           : connected
-            ? `Connected to ${BASE_URL} as session "${SESSION}". Feedback and handoffs arrive here as they are written.`
+            ? `Connected to ${BASE_URL} as session "${SESSION}". ${describeScope()} Feedback and handoffs arrive here as they are written.`
             : `Not connected to ${BASE_URL} right now; retrying.`
         return send({ id, result: { content: [{ type: "text", text }] } })
       }
@@ -136,11 +169,33 @@ function toChannel(name, event) {
   return null
 }
 
+function describeScope() {
+  if (!scopeView) return "No scope: this session gets feedback that no other session looks after."
+  const parts = [
+    ...scopeView.folders.map((f) => `folder "${f.title}"`),
+    ...scopeView.tags.map((t) => `tag "${t}"`),
+  ]
+  const missing = scopeView.unresolved.length ? ` Not found: ${scopeView.unresolved.join(", ")}.` : ""
+  return `Looks after ${parts.join(", ") || "nothing found"}.${missing}`
+}
+
 function onEvent(name, data) {
   if (name === "ready") {
     streamId = data.stream
     connected = true
-    log(`connected to ${BASE_URL} as session "${SESSION}"`)
+    const renamed = typeof data.session === "string" && data.session !== SESSION
+    if (typeof data.session === "string") SESSION = data.session
+    scopeView = data.scope ?? null
+    log(`connected to ${BASE_URL} as session "${SESSION}". ${describeScope()}`)
+    // Once (or when the name changed): the agent names its MCP session the same, so feedback on
+    // the documents it writes is routed back here.
+    if (!told || renamed) {
+      told = true
+      notify("notifications/claude/channel", {
+        content: `VikiEditor channel connected as session "${SESSION}". ${describeScope()} Call the VikiEditor session tool with label "${SESSION}" if you have not yet.`,
+        meta: { kind: "status", session: SESSION },
+      })
+    }
     return
   }
   if (name === "permission") {
@@ -174,7 +229,8 @@ async function listen() {
   let delay = 1000
   for (;;) {
     try {
-      const url = `${BASE_URL}/api/agent-events?client=claude-code&session=${encodeURIComponent(SESSION)}`
+      const scope = SCOPE ? `&scope=${encodeURIComponent(SCOPE)}` : ""
+      const url = `${BASE_URL}/api/agent-events?client=claude-code&session=${encodeURIComponent(SESSION)}${scope}`
       const abort = new AbortController()
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${API_KEY}`, Accept: "text/event-stream" },
