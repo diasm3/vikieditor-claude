@@ -10,8 +10,9 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { baseSession, forAnotherSession, instanceId, streamUrl } from "./session.mjs"
 
-const VERSION = "0.2.1"
+const VERSION = "0.2.2"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
@@ -42,12 +43,12 @@ const SCOPE = process.env.VIKIEDITOR_SCOPE
     : ""
 // The session's name in VikiEditor: VIKIEDITOR_SESSION, the config's "session", or the folder
 // Claude Code runs in. The server adds "-2" … when another window already has it.
-let SESSION = (
-  process.env.VIKIEDITOR_SESSION ||
-  (typeof CONFIG.session === "string" && CONFIG.session) ||
-  basename(process.cwd()) ||
-  "claude-code"
-).slice(0, 100)
+const BASE_SESSION = baseSession(process.env, CONFIG, basename(process.cwd()))
+// The name the server gave this window (BASE_SESSION, or "BASE_SESSION-2" …): shown to the agent and
+// matched against targetSession. Every reconnect asks for BASE_SESSION again, with the same
+// INSTANCE, so the server hands the same name back instead of adding another suffix.
+let ASSIGNED_SESSION = BASE_SESSION
+const INSTANCE = instanceId(process.env)
 let scopeView = null
 let told = false
 
@@ -112,7 +113,7 @@ async function handle(message) {
         const text = !API_KEY
           ? "Not configured: set the VikiEditor API key with /plugin configure vikieditor-channel@vikieditor."
           : connected
-            ? `Connected to ${BASE_URL} as session "${SESSION}". ${describeScope()} Feedback and handoffs arrive here as they are written.`
+            ? `Connected to ${BASE_URL} as session "${ASSIGNED_SESSION}". ${describeScope()} Feedback and handoffs arrive here as they are written.`
             : `Not connected to ${BASE_URL} right now; retrying.`
         return send({ id, result: { content: [{ type: "text", text }] } })
       }
@@ -151,8 +152,7 @@ const short = (id) => String(id).slice(0, 8)
 
 // The server routes a document's event to one session and names it (targetSession; null when it
 // went to everyone). One meant for another session is shown for information, not to act on.
-const forAnother = (event) =>
-  typeof event.targetSession === "string" && event.targetSession.toLowerCase() !== SESSION.toLowerCase()
+const forAnother = (event) => forAnotherSession(event.targetSession, [ASSIGNED_SESSION, BASE_SESSION])
 
 function toChannel(name, event) {
   if (name === "feedback") {
@@ -202,17 +202,17 @@ function onEvent(name, data) {
   if (name === "ready") {
     streamId = data.stream
     connected = true
-    const renamed = typeof data.session === "string" && data.session !== SESSION
-    if (typeof data.session === "string") SESSION = data.session
+    const renamed = typeof data.session === "string" && data.session !== ASSIGNED_SESSION
+    if (typeof data.session === "string") ASSIGNED_SESSION = data.session
     scopeView = data.scope ?? null
-    log(`connected to ${BASE_URL} as session "${SESSION}". ${describeScope()}`)
+    log(`connected to ${BASE_URL} as session "${ASSIGNED_SESSION}". ${describeScope()}`)
     // Once (or when the name changed): the agent names its MCP session the same, so feedback on
     // the documents it writes is routed back here.
     if (!told || renamed) {
       told = true
       notify("notifications/claude/channel", {
-        content: `VikiEditor channel connected as session "${SESSION}". ${describeScope()} Call the VikiEditor session tool with label "${SESSION}" if you have not yet.`,
-        meta: { kind: "status", session: SESSION },
+        content: `VikiEditor channel connected as session "${ASSIGNED_SESSION}". ${describeScope()} Call the VikiEditor session tool with label "${ASSIGNED_SESSION}" if you have not yet.`,
+        meta: { kind: "status", session: ASSIGNED_SESSION },
       })
     }
     return
@@ -248,8 +248,8 @@ async function listen() {
   let delay = 1000
   for (;;) {
     try {
-      const scope = SCOPE ? `&scope=${encodeURIComponent(SCOPE)}` : ""
-      const url = `${BASE_URL}/api/agent-events?client=claude-code&session=${encodeURIComponent(SESSION)}${scope}`
+      // Always the base name (never the one the server assigned) and this process's instance id
+      const url = streamUrl(BASE_URL, { session: BASE_SESSION, instance: INSTANCE, scope: SCOPE })
       const abort = new AbortController()
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${API_KEY}`, Accept: "text/event-stream" },
