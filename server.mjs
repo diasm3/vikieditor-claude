@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { baseSession, forAnotherSession, instanceId, streamUrl } from "./session.mjs"
 
-const VERSION = "0.2.2"
+const VERSION = "0.2.3"
 const SERVER_NAME = "vikieditor-channel"
 // The API host, not the web app: the event stream is long-lived and the app's /api rewrite is not
 const BASE_URL = (process.env.VIKIEDITOR_URL || "https://api.piai.company").replace(/\/+$/, "")
