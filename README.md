@@ -82,3 +82,7 @@ For one window only: `VIKIEDITOR_SCOPE="folder:VikiEditor,tag:vikieditor"`. The 
 | `VIKIEDITOR_INSTANCE` | a random id per process | Tells the server a reconnect is the same window, so it keeps the session's name; set it only to pin one |
 
 Requires Node.js 18 or later. No other dependencies.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

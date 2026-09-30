@@ -37,5 +37,6 @@
       "title": "VikiEditor API URL",
       "description": "VikiEditor API host. Leave empty for https://api.piai.company"
     }
-  }
+  },
+  "license": "MIT"
 }
